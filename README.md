@@ -1,5 +1,7 @@
 # The Creed (1999) – Unofficial Patch
 
+<p align="center"><img src="docs/images/cover.png" alt="The Creed (1999) box art" width="320"></p>
+
 Makes **The Creed** (Insomnia Entertainment / Dreamtime Interactive / Electronic Arts, 1999) playable on **Windows 10 and 11**, in full screen, with an optional **No-CD** mode and the **CD music** working again.
 
 The Creed is a cyberpunk action-adventure that was famous for being buggy even in 1999. On modern Windows it would not install, crashed or showed black screens. This patch fixes the game's own bugs in `Creed.exe` and bundles a tested graphics/music setup.
@@ -74,4 +76,4 @@ To verify the executable yourself: `python tools/patch_creed.py "C:\path\to\orig
 - Patch, tools and docs: **Andromeda Kiwi + Claude** – [MIT](LICENSE).
 - [dgVoodoo2](https://dege.freeweb.hu/) 2.87.6 by Dege – freeware, included unmodified.
 - [ogg-winmm](https://github.com/ayuanx/ogg-winmm) by ayuanx – GPL-2.0, built unmodified from source (see `patch/Licenses/`).
-- *The Creed* © 1998 Insomnia Entertainment Pty Limited. This is an unofficial fan patch, not affiliated with Insomnia Entertainment, Dreamtime Interactive or Electronic Arts. The game is abandonware; no game data files are included.
+- *The Creed* © 1998 Insomnia Entertainment Pty Limited; box art shown for identification only. This is an unofficial fan patch, not affiliated with Insomnia Entertainment, Dreamtime Interactive or Electronic Arts. The game is abandonware; no game data files are included.
