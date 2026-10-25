@@ -1,0 +1,1 @@
+ogg-winmm by ayuanx - https://github.com/ayuanx/ogg-winmm (GPL-2.0). Built from commit 11c13ecf727fc0b00b46e04acbf503a60e7df1db with i686-w64-mingw32-gcc.
