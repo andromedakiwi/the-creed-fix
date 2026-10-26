@@ -1,0 +1,59 @@
+name: Release
+
+# Publishes a GitHub Release when VERSION changes on main (or on demand).
+# The zip is built from the patch/ folder; notes come from docs/release-notes/v<VERSION>.md.
+on:
+  push:
+    branches: [main]
+    paths: [VERSION]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read version
+        id: v
+        run: echo "version=$(tr -d '[:space:]' < VERSION)" >> "$GITHUB_OUTPUT"
+
+      - name: Skip if the release already exists
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "v${{ steps.v.outputs.version }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Verify patched Creed.exe
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          expected=$(grep -oP "MD5_PATCHED = '\K[0-9a-f]+" tools/patch_creed.py)
+          actual=$(md5sum patch/Creed.exe | cut -d' ' -f1)
+          echo "expected $expected, got $actual"
+          test "$expected" = "$actual"
+
+      - name: Build zip
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          cd patch
+          zip -r -X "../TheCreed_UnofficialPatch_v${{ steps.v.outputs.version }}.zip" .
+
+      - name: Create release
+        if: steps.check.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          v="v${{ steps.v.outputs.version }}"
+          notes="docs/release-notes/${v}.md"
+          title="$v"
+          [ -f "$notes" ] || { echo "Missing $notes"; exit 1; }
+          gh release create "$v" "TheCreed_UnofficialPatch_${v}.zip" \
+            --target "$GITHUB_SHA" --title "$title" --notes-file "$notes" --latest
