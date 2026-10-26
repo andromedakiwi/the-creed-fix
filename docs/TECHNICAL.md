@@ -34,7 +34,7 @@ Windows 98 DirectDraw tolerated blitting a texture surface to the back buffer; m
 
 `InstallType == "MAXIMUM"` sets `[0x4F5368] = 1` (everything on disk), otherwise 2.
 
-**Fix (v1.2):** `0x0043C7D1` (the point both registry paths reach, before the launcher dialog) → `jmp 0x00488378` (v1.3 address):
+**Fix (v1.2):** `0x0043C7D1` (the point both registry paths reach, before the launcher dialog) → `jmp 0x00488384` (v1.4 address):
 
 ```
 mov dword ptr [0x4F7234], 1      ; accelerated scene data installed
@@ -58,38 +58,38 @@ Rectangle list at the time of the crash (surfaces are 640×480, pitch `0x500`):
 
 There is no clipping, so anything near or off screen reads/writes outside the buffer. Windows 98 usually survived the stray accesses.
 
-**Fix:** `0x004257FB` → `jmp 0x004882D0` + NOPs; cave:
+**Same cause, visible symptom – trails at the screen edges:** the function that consumes the list, `0x00425670`, first restores the background of every rectangle from the *previous* frame's list (`0x004B9470`, a copy of `0x004B689C`) with `BltFast(back, left, top, background, &rect)`. A rectangle that sticks out of the screen makes `BltFast` fail with `DDERR_INVALIDRECT` for the whole rectangle, so the cursor or a character leaves a trail along the edges until the scene is redrawn.
+
+**Fix (v1.4):** the function entry `0x00425670` → `jmp 0x004882D0` (CLIP cave), which clips every rectangle of `0x004B689C` in place before anything uses it, then runs the replaced instructions:
 
 ```
-mov ebp, [eax+0x4B68A0]   ; top
-mov ebx, [eax+0x4B689C]   ; left
-mov ecx, [eax+0x4B68A4]   ; right
-mov eax, [eax+0x4B68A8]   ; bottom
-test ebx,ebx / jge / xor ebx,ebx          ; left   >= 0
-test ebp,ebp / jge / xor ebp,ebp          ; top    >= 0
-cmp ecx,[esp+0x30] / jle / mov ecx,[esp+0x30]   ; right  <= width  (locked DDSURFACEDESC)
-cmp eax,[esp+0x2C] / jle / mov eax,[esp+0x2C]   ; bottom <= height
-jmp 0x00425813
+movzx ecx, word [0x4B6898] ; edx = 0x4B689C ; eax = 0
+loop: left  = max(left, 0)    top    = max(top, 0)
+      right = min(right, 640) bottom = min(bottom, 480)
+      edx += 16 ; dec ecx
+mov eax, [0x4F6EEC] ; sub esp, 0xEC ; jmp 0x0042567B
 ```
 
-Empty rectangles are then skipped by the original `right > left` / `bottom > top` checks. The code caves live in the zero padding at the end of `.text`; its `VirtualSize` is raised from `0x872C6` to `0x87400` (PE header, file offset `0x180`) so the padding is mapped.
+Both the colour restore and the depth copy then work on valid rectangles; empty ones are skipped by the original `right > left` / `bottom > top` checks (the depth copy) or rejected harmlessly (`BltFast`). v1.0–v1.3 clipped only inside the depth-copy loop (`0x004257FB` → cave), which fixed the crash but not the trails.
+
+The code caves live in the zero padding at the end of `.text`; its `VirtualSize` is raised from `0x872C6` to `0x87400` (PE header, file offset `0x180`) so the padding is mapped.
 
 ## 4. No-CD
 
 **CD check:** `0x00405CF0` enumerates drives (`GetLogicalDriveStringsA`, `GetDriveTypeA == DRIVE_CDROM`, `GetVolumeInformationA`) and accepts `CREED_MAIN` when `[0x4F5368] == 1` or `CREED_DATA` when it is 2; the root is stored in `0x004F5268`. Wrappers at `0x00405B70` / `0x00428C8C` show *"Please insert the CD"* (Retry/Cancel). The root is only used as `"%sData\data.v00"` (`0x00408388`, `0x0040BEF7`, `0x0040E9FE`; disc 2 code swaps the extension to `.v01-.v03`). No copy protection is involved.
 
-**Fix (hybrid, v1.2):** `0x00405CF0` → `jmp 0x00488310` (v1.3 address):
+**Fix (hybrid, v1.2):** `0x00405CF0` → `jmp 0x00488328` (v1.4 address):
 
 ```
-mov eax, "cd1\" ; mov edx, "cd1\Data\data.v00"
+mov edx, "cd1\Data\data.v00"
 cmp byte ptr [0x4F5368], 2 / jne
-mov eax, "cd2\" ; mov edx, "cd2\Data\Data.v01"
-push eax
+mov edx, "cd2\Data\Data.v01"
+push edx                                   ; keep the path on the stack: edx is volatile
 CreateFileA(edx, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, 0x80, 0)
 cmp eax, -1 / je nofiles
-CloseHandle(eax) ; pop eax
-copy 4-byte prefix to 0x4F5268, terminate, return 1
-nofiles: pop eax ; sub esp, 0x20C ; jmp 0x00405CF6   ; original drive search
+CloseHandle(eax) ; pop edx
+copy the first 4 bytes ("cd1\" / "cd2\") to 0x4F5268, terminate, return 1
+nofiles: pop edx ; sub esp, 0x20C ; jmp 0x00405CF6   ; original drive search
 ```
 
 ## 5. CD music
@@ -121,13 +121,17 @@ DxWnd + Ramp (Non-Accelerated build): the Ramp device lights by writing colour r
 Also: the window procedure (`0x0043C3F0`) only handles `WM_DESTROY`, `WM_CLOSE`, `SC_KEYMENU` and `0x3B9`; the DirectInput keyboard is set to `DISCL_EXCLUSIVE | DISCL_BACKGROUND` (9) at `0x00405FC1` and is never re-acquired; the mouse has no cooperative level set.
 
 **Fix:**
-- WndProc `0x0043C3FA` → `jmp 0x00488398`: on `WM_ACTIVATEAPP` store `[0x4F8F00] = !wParam`, then continue the original code. `0x4F8F00` lies in the zero-filled tail of the `.data` page (`VirtualSize` ends at `0x4F86D0`), which nothing else references.
+- WndProc `0x0043C3FA` → `jmp 0x004883A4` (v1.4 address): on `WM_ACTIVATEAPP` store `[0x4F8F00] = !wParam`, then continue the original code. `0x4F8F00` lies in the zero-filled tail of the `.data` page (`VirtualSize` ends at `0x4F86D0`), which nothing else references.
 - Pause loop: `0x0042A205` and `0x0042A254` test `[0x4F8F00]` instead of calling `TestCooperativeLevel`. On return the original restore/reload path runs unchanged.
 - Keyboard cooperative level `9` → `0xA` (`NONEXCLUSIVE | BACKGROUND`; background is kept because the game never re-acquires the device).
 - dgVoodoo2 `CaptureMouse = false`.
 
-Cave layout in v1.3: clipping `0x004882D0`, No-CD `0x00488310`, registry `0x00488378`, WndProc `0x00488398`, strings `0x004883B8`.
+**Cursor gone after returning (v1.4):** the mouse is read with `GetDeviceState` in immediate mode (`0x0040884D`, deltas in `0x004E7BF0`, added to the cursor at `0x004F6FF0/F4`). For relative axes that returns the movement since the previous read, so everything done on the desktop while the game was paused arrived in one frame and threw the cursor far off screen. Fix: on leaving the pause loop (`0x0042A25D`) a `call` to the MOUSE cave does one throw-away `GetDeviceState` before the original restore path.
+
+Cave layout in v1.4 (built directly from the original exe by `tools/dev/build_v1.4.py`): CLIP `0x004882D0`, CD `0x00488328`, REG `0x00488384`, WND `0x004883A4`, MOUSE `0x004883C4`, strings `0x004883D8`. The PE `TimeDateStamp` is +1 – a fresh hash for the release build after Windows Smart App Control blocked the first v1.4 build.
 
 ## 8. Known remaining issues
+
+- **Smart App Control** (Windows 11) blocks unsigned executables without reputation, so the patched `Creed.exe` may be blocked until it is code-signed.
 
 - **Intro videos** are played through DirectShow before the exclusive full-screen mode is set, so they appear in a window.

@@ -1,5 +1,5 @@
 =====================================================================
- THE CREED (1999) - UNOFFICIAL PATCH v1.3
+ THE CREED (1999) - UNOFFICIAL PATCH v1.4
  by Andromeda Kiwi + Claude
 =====================================================================
 
@@ -84,10 +84,11 @@ Without the Music folder the game is simply silent there.
    Windows 98 let the game copy it to the screen; modern DirectDraw
    implementations refuse, so the background never appeared.
 
-3. Crash a few seconds into gameplay (original 1999 bug).
-   When characters or effects are near or past the screen edge, the
-   game copies depth-buffer rectangles outside the 640x480 buffer.
-   Windows 98 often survived that; modern Windows does not. Creed.exe
+3. Crash a few seconds into gameplay, and cursor/character trails at
+   the screen edges (original 1999 bug). When something is near or
+   past the screen edge, the game's "dirty rectangles" go outside the
+   640x480 screen: the depth copy then reads outside its buffer
+   (crash) and the background restore is rejected (trails). Creed.exe
    now clips those rectangles to the screen.
 
 4. Graphics on modern GPUs: dgVoodoo2 2.87.6 (by Dege) is included,
@@ -107,13 +108,19 @@ Without the Music folder the game is simply silent there.
    a modern wrapper - so it never resumed, and the keyboard was opened
    in exclusive background mode. Creed.exe now pauses and resumes on
    WM_ACTIVATEAPP and uses a non-exclusive keyboard; the mouse is no
-   longer captured by dgVoodoo2.
+   longer captured by dgVoodoo2, and mouse movement made while the
+   game was paused is discarded (it used to throw the cursor off
+   screen).
 
 
 ---------------------------------------------------------------------
  KNOWN ISSUES
 ---------------------------------------------------------------------
 
+- Windows 11 Smart App Control may block Creed.exe ("could not verify
+  its publisher") because the patched executable is not code-signed.
+  It has no per-app exception; it can only be turned off in Windows
+  Security > App & browser control.
 - The intro videos play in a window (desktop visible at the sides);
   the game goes full screen as soon as you press Enter/Esc.
 - Missions have not been tested to the end yet. The game was infamous
@@ -160,6 +167,8 @@ CrashDumps folder - attach it to your report.
  CHANGES
 ---------------------------------------------------------------------
 
+v1.4  No more cursor/character trails at the screen edges; cursor no
+      longer lost after Alt+Tab.
 v1.3  Alt+Tab / Ctrl+Alt+Del fixed: the game pauses when you leave and
       resumes when you come back; mouse and keyboard are released.
 v1.2  Just extract and play: ships the patched Creed.exe, no installer
@@ -175,38 +184,40 @@ v1.0  First release: registry fix, menu background fix, gameplay
 ---------------------------------------------------------------------
 
 Original Creed.exe MD5: 746DFE681C5B157DBD53C3CD18D336C5
-Patched  Creed.exe MD5: 80BA90515BEA3D43BA223961CC63B150
+Patched  Creed.exe MD5: C8E4A51C772495CD13CA5811A0536552
 
 File offset  VA          Change
+0x00088      (PE hdr)    TimeDateStamp +1 (release build identity)
 0x00180      (PE hdr)    .text VirtualSize 0x872C6 -> 0x87400
                          (maps the code caves below)
 0x06115      0x00406D15  CreateSurface caps of the background buffer
                          0x1800 (SYSTEMMEMORY|TEXTURE) ->
                          0x2840 (OFFSCREENPLAIN|SYSTEMMEMORY|3DDEVICE)
-0x24BFB      0x004257FB  jmp 0x004882D0 + NOPs
-0x876D0      0x004882D0  cave: load dirty rect, clamp left/top >= 0
-                         and right/bottom <= surface width/height
-                         (from the locked DDSURFACEDESC), jmp back to
-                         0x00425813
-0x3BBD1      0x0043C7D1  jmp 0x00488378 + NOPs (after the registry read)
-0x87778      0x00488378  cave: [0x4F7234] = 1 (accelerated scene data
-                         installed), [0x4F5368] = 1 (full install),
-                         then the replaced instructions, jmp 0x0043C7DA
-0x050F0      0x00405CF0  CD drive search -> jmp 0x00488310
-0x87710      0x00488310  cave: disc 1 -> "cd1\", disc 2 -> "cd2\"
+0x24A70      0x00425670  dirty-rect function entry -> jmp CLIP cave
+0x876D0      0x004882D0  CLIP: clip every rect of the list at 0x4B689C
+                         to 0..640 x 0..480 in place, then the replaced
+                         instructions, jmp 0x0042567B
+0x050F0      0x00405CF0  CD drive search -> jmp CD cave
+0x87728      0x00488328  CD: disc 1 -> "cd1\", disc 2 -> "cd2\"
                          ([0x4F5368]); if cd?\Data\data.v00 / Data.v01
                          opens (CreateFileA), use it as the CD root and
                          return 1, else run the original drive search
-0x3B7FA      0x0043C3FA  WndProc -> jmp 0x00488398
-0x87798      0x00488398  cave: on WM_ACTIVATEAPP store [0x4F8F00] =
+0x3BBD1      0x0043C7D1  after the registry read -> jmp REG cave
+0x87784      0x00488384  REG: [0x4F7234] = 1 (accelerated scene data
+                         installed), [0x4F5368] = 1 (full install),
+                         then the replaced instructions, jmp 0x0043C7DA
+0x3B7FA      0x0043C3FA  WndProc -> jmp WND cave
+0x877A4      0x004883A4  WND: on WM_ACTIVATEAPP store [0x4F8F00] =
                          !wParam (zero page tail of .data), continue
 0x29605      0x0042A205  focus pause: enter while [0x4F8F00] != 0
-0x29654      0x0042A254  ...leave when it is 0, then the original
-                         RestoreAllSurfaces + texture reload
+0x29654      0x0042A254  ...leave when it is 0, call MOUSE cave, then
+                         the original RestoreAllSurfaces + reload
                          (was: IDirectDraw4::TestCooperativeLevel)
-0x053C1      0x00405FC1  keyboard SetCooperativeLevel 9 -> 0xA
+0x877C4      0x004883C4  MOUSE: one GetDeviceState on the mouse to drop
+                         movement accumulated while paused
+0x053C2      0x00405FC2  keyboard SetCooperativeLevel 9 -> 0xA
                          (non-exclusive, background)
-0x877B8      0x004883B8  strings used by the caves
+0x877D8      0x004883D8  strings used by the caves
 
 Registry the original game reads: HKEY_CLASSES_ROOT\The Creed
   (Scene8, Scene16, InstallType, InstallDir, Password, LockCode).

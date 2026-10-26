@@ -6,7 +6,7 @@ Makes **The Creed** (Insomnia Entertainment / Dreamtime Interactive / Electronic
 
 The Creed is a cyberpunk action-adventure that was famous for being buggy even in 1999. On modern Windows it would not install, crashed or showed black screens. This patch fixes the game's own bugs in `Creed.exe` and bundles a tested graphics/music setup.
 
-> **Status:** community test release (v1.3). Tested on Windows 11 (Intel graphics) through the menus, intro and early gameplay, including Alt+Tab. Please [report](../../issues/new/choose) what works and what breaks.
+> **Status:** community test release (v1.4). Tested on Windows 11 (Intel graphics) through the menus, intro and gameplay, including Alt+Tab. Please [report](../../issues/new/choose) what works and what breaks.
 
 By **Andromeda Kiwi + Claude**.
 
@@ -14,7 +14,7 @@ By **Andromeda Kiwi + Claude**.
 
 ## Download & install
 
-1. Download **`TheCreed_UnofficialPatch_v1.3.zip`** from [Releases](../../releases/latest).
+1. Download **`TheCreed_UnofficialPatch_v1.4.zip`** from [Releases](../../releases/latest).
 2. *(Optional)* keep a copy of your original `Creed.exe`.
 3. Extract the zip into your game folder (the one with `Creed.exe` and `Data\`) and overwrite.
 4. Run `Creed.exe` and play.
@@ -37,8 +37,10 @@ The ambient soundtrack is CD 1 audio tracks 2–19. Rip them with [fre:ac](https
 |---|---|---|
 | *"Non-Accelerated scene data not found"* | Mode chosen from a registry key the original installer wrote; without it the game forces software mode | `Creed.exe` no longer depends on the registry |
 | Black menu backgrounds, mouse cursor trails | 640×480 background buffer created as a *texture* surface; modern DirectDraw refuses to blit it (`DDERR_UNSUPPORTED`) | Created as a plain off-screen surface |
-| Crash a few seconds into gameplay | **Original 1999 bug**: depth-buffer "dirty rectangles" outside the screen are copied without clipping → access violation | Rectangles clipped to the buffer size |
+| Crash a few seconds into gameplay | **Original 1999 bug**: "dirty rectangles" outside the screen are copied without clipping → depth copy reads outside the buffer (access violation) | Rectangles clipped to the screen |
+| Cursor / character trails at the screen edges | Same unclipped rectangles: the background restore `BltFast` rejects the whole rectangle, so nothing is redrawn | Same clipping |
 | Alt+Tab / Ctrl+Alt+Del: game never comes back, mouse stuck | Focus-loss pause waits for DirectDraw exclusive mode, which the wrapper never reports back; keyboard opened in exclusive background mode | Pause driven by `WM_ACTIVATEAPP`; keyboard non-exclusive; dgVoodoo mouse capture off |
+| Cursor gone after Alt+Tab | Mouse read in immediate mode: movement made on the desktop is delivered all at once on return, throwing the cursor far off screen | Accumulated movement discarded on resume |
 | Needs the CDs | Disc check by volume label (`CREED_MAIN` / `CREED_DATA`) to read `data.v00` / `Data.v01-03` | Uses `cd1\` / `cd2\` when present, otherwise the real CD |
 | No music without the CD | CD-Audio via MCI | ogg-winmm |
 | Graphics on modern GPUs | DirectDraw 6 + Direct3D HAL, 16-bit | dgVoodoo2 2.87.6 with a tested config |
@@ -47,6 +49,7 @@ All the details – addresses, disassembly and how each bug was found – are in
 
 ## Known issues
 
+- **Windows 11 Smart App Control** may block the patched `Creed.exe` (*"could not verify its publisher"*): the executable is not code-signed yet. SAC has no per-app exception; it can only be turned off in Windows Security → App & browser control.
 - Intro videos play in a window; the game goes full screen after Enter/Esc.
 - Not yet tested to the end of the campaign (the game was infamous for freezing before the ending).
 - Multiplayer untested. The *Non-Accelerated* (software/Ramp) version is not supported – its 3D renders almost black on modern systems.
@@ -60,12 +63,12 @@ Open an [issue](../../issues/new/choose) with your Windows version, GPU and what
 
 ```
 patch/            the release content, ready to extract into the game folder
-  Creed.exe         patched executable (MD5 80BA90515BEA3D43BA223961CC63B150)
+  Creed.exe         patched executable (MD5 C8E4A51C772495CD13CA5811A0536552)
   DDraw.dll, D3DImm.dll, dgVoodoo.conf   dgVoodoo2 2.87.6 + config
   winmm.dll, winmm.ini                   ogg-winmm (CD music)
   Extras/           CopyCDs.bat (No-CD), EnableCrashDumps.bat
 tools/patch_creed.py  rebuilds the patched Creed.exe from the original (stdlib only)
-tools/dev/            the assembler scripts used to build the code caves (keystone/capstone)
+tools/dev/build_v1.4.py  assembles every change from the original exe (keystone/capstone)
 docs/                 technical write-up and changelog
 ```
 
