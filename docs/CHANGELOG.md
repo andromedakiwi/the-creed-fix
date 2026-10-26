@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.3 – 2026-10-26
+- Alt+Tab / Ctrl+Alt+Del fixed: the game pauses on focus loss (WM_ACTIVATEAPP) and resumes when you return, restoring its surfaces.
+- DirectInput keyboard switched from exclusive to non-exclusive background mode.
+- dgVoodoo2: `CaptureMouse = false`, so the mouse is free outside the game.
+
 ## v1.2 – 2026-10-25
 - Ships the patched `Creed.exe`: extract into the game folder and play. No installer, no registry key needed.
 - Hybrid No-CD: uses `cd1\` / `cd2\` when present, otherwise the real CD.

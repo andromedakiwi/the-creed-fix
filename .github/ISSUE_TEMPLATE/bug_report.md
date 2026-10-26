@@ -4,7 +4,7 @@ about: Something does not work in The Creed with the patch
 labels: bug
 ---
 
-**Patch version:** v1.2
+**Patch version:** v1.3
 
 **Windows version:**
 

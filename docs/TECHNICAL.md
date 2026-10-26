@@ -34,7 +34,7 @@ Windows 98 DirectDraw tolerated blitting a texture surface to the back buffer; m
 
 `InstallType == "MAXIMUM"` sets `[0x4F5368] = 1` (everything on disk), otherwise 2.
 
-**Fix (v1.2):** `0x0043C7D1` (the point both registry paths reach, before the launcher dialog) → `jmp 0x00488390`:
+**Fix (v1.2):** `0x0043C7D1` (the point both registry paths reach, before the launcher dialog) → `jmp 0x00488378` (v1.3 address):
 
 ```
 mov dword ptr [0x4F7234], 1      ; accelerated scene data installed
@@ -78,7 +78,7 @@ Empty rectangles are then skipped by the original `right > left` / `bottom > top
 
 **CD check:** `0x00405CF0` enumerates drives (`GetLogicalDriveStringsA`, `GetDriveTypeA == DRIVE_CDROM`, `GetVolumeInformationA`) and accepts `CREED_MAIN` when `[0x4F5368] == 1` or `CREED_DATA` when it is 2; the root is stored in `0x004F5268`. Wrappers at `0x00405B70` / `0x00428C8C` show *"Please insert the CD"* (Retry/Cancel). The root is only used as `"%sData\data.v00"` (`0x00408388`, `0x0040BEF7`, `0x0040E9FE`; disc 2 code swaps the extension to `.v01-.v03`). No copy protection is involved.
 
-**Fix (hybrid, v1.2):** `0x00405CF0` → `jmp 0x00488320`:
+**Fix (hybrid, v1.2):** `0x00405CF0` → `jmp 0x00488310` (v1.3 address):
 
 ```
 mov eax, "cd1\" ; mov edx, "cd1\Data\data.v00"
@@ -108,10 +108,26 @@ Findings from testing on Windows 11 (Intel iGPU):
 | `FastVideoMemoryAccess` | `false` | `true` → image freezes on the last menu frame (game draws via Lock) |
 | `PrimarySurfaceBatchedUpdate` | `false` | `true` → menu selector never shown (menus draw straight to the primary surface) |
 | `PresentationModel` | `discard` | with batching off, keeps the menu fast |
+| `CaptureMouse` | `false` | `true` keeps the cursor locked to the game after Alt+Tab |
 
 DxWnd + Ramp (Non-Accelerated build): the Ramp device lights by writing colour ramps into the 8-bit palette; under emulation characters and the cursor come out black and scenes very dark – not fixed.
 
-## 7. Known remaining issues
+## 7. Alt+Tab / Ctrl+Alt+Del (v1.3)
 
-- **Focus loss:** `0x0042A180` loops on `IDirectDraw4::TestCooperativeLevel` → `WaitMessage` until exclusive mode returns, which never happens under the wrapper after Alt+Tab.
+**Symptom:** after leaving the game it could not be brought back (sound kept playing), and the mouse stayed locked to the game.
+
+**Evidence (Task Manager dump):** main thread inside `0x0042A180`, the per-frame message pump. When `IDirectDraw4::TestCooperativeLevel` ([`0x4F6A08`] vtable `+0x68`) fails, the game loops on `WaitMessage` until it succeeds again, then calls `RestoreAllSurfaces` (`+0x64`) and reloads its textures (`0x0040A7B0` accelerated / `0x0040A4D0` software). Under dgVoodoo2 exclusive mode is never reported back, so the loop never ends; the audio runs on its own thread.
+
+Also: the window procedure (`0x0043C3F0`) only handles `WM_DESTROY`, `WM_CLOSE`, `SC_KEYMENU` and `0x3B9`; the DirectInput keyboard is set to `DISCL_EXCLUSIVE | DISCL_BACKGROUND` (9) at `0x00405FC1` and is never re-acquired; the mouse has no cooperative level set.
+
+**Fix:**
+- WndProc `0x0043C3FA` → `jmp 0x00488398`: on `WM_ACTIVATEAPP` store `[0x4F8F00] = !wParam`, then continue the original code. `0x4F8F00` lies in the zero-filled tail of the `.data` page (`VirtualSize` ends at `0x4F86D0`), which nothing else references.
+- Pause loop: `0x0042A205` and `0x0042A254` test `[0x4F8F00]` instead of calling `TestCooperativeLevel`. On return the original restore/reload path runs unchanged.
+- Keyboard cooperative level `9` → `0xA` (`NONEXCLUSIVE | BACKGROUND`; background is kept because the game never re-acquires the device).
+- dgVoodoo2 `CaptureMouse = false`.
+
+Cave layout in v1.3: clipping `0x004882D0`, No-CD `0x00488310`, registry `0x00488378`, WndProc `0x00488398`, strings `0x004883B8`.
+
+## 8. Known remaining issues
+
 - **Intro videos** are played through DirectShow before the exclusive full-screen mode is set, so they appear in a window.
