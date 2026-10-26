@@ -1,4 +1,4 @@
-﻿# The Creed - Unofficial Patch v1.4 (Andromeda Kiwi + Claude)
+﻿# The Creed - Unofficial Patch v1.5 (Andromeda Kiwi + Claude)
 # Optional: makes Windows save a minidump in <game folder>\CrashDumps whenever Creed.exe crashes.
 # Needs administrator rights (Windows Error Reporting settings live in HKLM).
 $ErrorActionPreference = 'Stop'

@@ -96,6 +96,21 @@ nofiles: pop edx ; sub esp, 0x20C ; jmp 0x00405CF6   ; original drive search
 
 `0x00431A80` opens MCI `cdaudio`, sets `MCI_FORMAT_TMSF`; `0x00431B20` plays from track *n+1* to *n+2* with `MCI_NOTIFY`. Disabled when the requested disc is 2. ogg-winmm (a `winmm.dll` wrapper) answers these calls and plays `Music\TrackNN.ogg`.
 
+**Music volume (v1.5):** the slider calls `0x00431BB0(vol)` (`vol` 0..`0xFFFF`; callers `0x0040C51F`, `0x0040C6EE`, default `0xCCCC` at `0x0040CA90`). It used `mixerOpen` / `mixerGetLineInfoA` with `MIXERLINE_COMPONENTTYPE_SRC_COMPACTDISC` (`0x1005`) / `mixerSetControlDetails` – the analogue CD-audio line of 1990s sound cards. Modern systems have no such line, so it failed silently and the music always played at full volume. The function body (249 bytes) is replaced in place by:
+
+```
+GetModuleHandleA("winmm.dll")            ; the loaded winmm.dll is ogg-winmm (game folder)
+GetProcAddress(eax, "auxSetVolume")
+auxSetVolume(0, vol | vol << 16)          ; ogg-winmm: CDDA volume, both channels
+ret
+```
+
+## 5b. Intro video option (v1.5)
+
+Single Player starts at `0x00408320`; for single player it checks disc 1 and plays `"%sData\data.v00"` with the DirectShow player at `0x0040B7A0` (FlipToGDISurface, normal cooperative level, RenderFile, wait for end or key). It always played. The Configuration dialog (resource 331) already had an **Intro Attract** checkbox (id 1067) stored in `[0x4F5258]` – the last dword of the `Config.dat` block (`0x4F50B8`, `0x1A4` bytes) – but it only enabled the attract video after 30 s idle in the menu (`0x0040BEBD`).
+
+**Fix:** `0x00408367` (19 bytes) → `jmp` INTRO cave: set `[0x4F5374] = 1` (replaced instruction), skip to `0x004083BE` if multiplayer (`[0x4BCD90] != 0`, as before) or if `[0x4F5258] == 0`, else continue at `0x0040837A`. The checkbox text is changed to "Intro Videos " (same UTF-16 length, so the dialog template keeps its size).
+
 ## 6. Graphics wrapper settings (dgVoodoo2 2.87.6)
 
 Findings from testing on Windows 11 (Intel iGPU):
@@ -128,7 +143,7 @@ Also: the window procedure (`0x0043C3F0`) only handles `WM_DESTROY`, `WM_CLOSE`,
 
 **Cursor gone after returning (v1.4):** the mouse is read with `GetDeviceState` in immediate mode (`0x0040884D`, deltas in `0x004E7BF0`, added to the cursor at `0x004F6FF0/F4`). For relative axes that returns the movement since the previous read, so everything done on the desktop while the game was paused arrived in one frame and threw the cursor far off screen. Fix: on leaving the pause loop (`0x0042A25D`) a `call` to the MOUSE cave does one throw-away `GetDeviceState` before the original restore path.
 
-Cave layout in v1.4 (built directly from the original exe by `tools/dev/build_v1.4.py`): CLIP `0x004882D0`, CD `0x00488328`, REG `0x00488384`, WND `0x004883A4`, MOUSE `0x004883C4`, strings `0x004883D8`. The PE `TimeDateStamp` is +1 – a fresh hash for the release build after Windows Smart App Control blocked the first v1.4 build.
+Layout in v1.5 (built directly from the original exe by `tools/dev/build_v1.5.py`): `.text` caves CLIP `0x004882D0`, CD `0x00488328`, REG `0x00488384`, WND `0x004883A4`, INTRO `0x004883C4`, MOUSE `0x004883EC` (the zero padding is now used up to `0x00488400`); strings in the zero slack after `.rdata` (`0x0048AA30`, `.rdata` `VirtualSize` `0x1A23` → `0x1C00`). The PE `TimeDateStamp` is changed only to give the release build a hash that Windows Smart App Control accepted in testing.
 
 ## 8. Known remaining issues
 

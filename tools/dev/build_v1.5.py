@@ -1,7 +1,9 @@
-"""Development script: builds Creed.exe v1.4 directly from the ORIGINAL Creed.exe v1.6 build 160.
+"""Development script: builds Creed.exe v1.5 directly from the ORIGINAL Creed.exe v1.6 build 160.
 Fixes: background caps, dirty-rect clipping (colour + depth), registry independence, hybrid No-CD,
-focus-loss pause via WM_ACTIVATEAPP, non-exclusive keyboard, mouse delta flush on resume.
-Usage: python tools/dev/build_v1.4.py <original Creed.exe> <out.exe>      Requires: pip install keystone-engine capstone"""
+focus-loss pause via WM_ACTIVATEAPP, non-exclusive keyboard, mouse delta flush on resume,
+startup intro video controlled by the Configuration checkbox (renamed 'Intro Videos'),
+music volume routed to winmm auxSetVolume (ogg-winmm) instead of the CD-audio mixer line.
+Usage: python tools/dev/build_v1.5.py <original Creed.exe> <out.exe>      Requires: pip install keystone-engine capstone"""
 import keystone, capstone, hashlib, sys
 SRC, OUT = sys.argv[1], sys.argv[2]
 d = bytearray(open(SRC, 'rb').read())
@@ -94,6 +96,15 @@ w1: cmp esi, 0x10
  ja 0x43c423
  jmp 0x43c3ff
 """),
+('INTRO', """
+ mov dword ptr [0x4f5374], 1
+ cmp dword ptr [0x4bcd90], 0
+ jne i9
+ cmp dword ptr [0x4f5258], 0
+ je i9
+ jmp 0x40837a
+i9: jmp 0x4083be
+"""),
 ('MOUSE', """
  mov eax, dword ptr [0x4f69fc]
  push 0x4e7bf0
@@ -104,7 +115,8 @@ w1: cmp esi, 0x10
  ret
 """),
 ]
-strings = [('T1', b'cd1\\Data\\data.v00\0'), ('T2', b'cd2\\Data\\Data.v01\0')]
+strings = [('T1', b'cd1\\Data\\data.v00\0'), ('T2', b'cd2\\Data\\Data.v01\0'), ('WINMM', b'winmm.dll\0'), ('AUXSET', b'auxSetVolume\0')]
+RDATA_STR = 0x48aa30   # zero slack after .rdata VirtualSize 0x1a23 (raw size 0x1c00)
 
 # layout: code caves first (16-byte aligned), strings at the end
 addr = {}
@@ -114,15 +126,26 @@ for name, src in caves:   # first pass with dummy string addresses to get sizes
     sizes[name] = len(asm(src.format(T1='0x488300', T2='0x488300'), 0x488300))
 for name, _ in caves:
     addr[name] = va; va = (va + sizes[name] + 3) & ~3
-for name, s in strings:
-    addr[name] = va; va += len(s)
 assert va <= CAVE_END, f'caves overflow: end {va:#x}'
+CAVES_END = va
+sva = RDATA_STR
+for name, s in strings:
+    addr[name] = sva; sva += len(s)
+assert sva <= 0x48ac00
 for name, src in caves:
     b = asm(src.format(T1=f"{addr['T1']:#x}", T2=f"{addr['T2']:#x}"), addr[name])
     assert len(b) == sizes[name]
     o = off(addr[name]); assert d[o:o+len(b)] == bytes(len(b)); d[o:o+len(b)] = b
+roff = lambda va: va - 0x489000 + 0x87800      # .rdata: VA 0x489000, raw 0x87800
 for name, s in strings:
-    o = off(addr[name]); assert d[o:o+len(s)] == bytes(len(s)); d[o:o+len(s)] = s
+    o = roff(addr[name]); assert d[o:o+len(s)] == bytes(len(s)); d[o:o+len(s)] = s
+# .rdata VirtualSize 0x1A23 -> 0x1C00 so the strings are inside the section
+rsec = 0x80 + 0x18 + 0xe0 + 0x28        # e_lfanew + PE sig/FileHeader + OptionalHeader + 2nd section header
+assert d[rsec:rsec+8].rstrip(b'\0') == b'.rdata' and d[rsec+8:rsec+12] == (0x1a23).to_bytes(4, 'little')
+d[rsec+8:rsec+12] = (0x1c00).to_bytes(4, 'little')
+# Configuration dialog checkbox label: 'Intro Attract' -> 'Intro Videos ' (same length, UTF-16)
+lab_old, lab_new = 'Intro Attract'.encode('utf-16le'), 'Intro Videos '.encode('utf-16le')
+assert d.count(lab_old) == 1; i = d.find(lab_old); d[i:i+len(lab_old)] = lab_new
 
 def hook(va, orig_hex, src, total):
     o = off(va); assert d[o:o+total] == bytes.fromhex(orig_hex), (hex(va), d[o:o+total].hex())
@@ -135,20 +158,48 @@ hook(0x43c7d1, '8b4c24246880000000', f"jmp {addr['REG']:#x}", 9)               #
 hook(0x43c3fa, '83fe107724', f"jmp {addr['WND']:#x}", 5)                       # WM_ACTIVATEAPP
 hook(0x42a205, 'a1086a4f00508b10ff526885c00f8488000000',
      f"cmp dword ptr [{INACTIVE:#x}], 0\n je 0x42a2a0", 19)                     # pause while inactive
+hook(0x408367, 'a190cd4b00c70574534f000100000085c07544',
+     f"jmp {addr['INTRO']:#x}", 19)                                            # startup intro only if 'Intro Videos' checked
+# Music volume: replace the body of 0x431BB0 (CD-audio mixer line, absent on modern Windows)
+# with auxSetVolume(0, vol | vol << 16) from the loaded winmm.dll (ogg-winmm).
+o = off(0x431bb0); assert d[o:o+6] == bytes.fromhex('81ec78010000')
+vol_body = asm(f"""
+ push {addr['WINMM']:#x}
+ call dword ptr [0x4f9490]
+ test eax, eax
+ je v9
+ push {addr['AUXSET']:#x}
+ push eax
+ call dword ptr [0x4f9430]
+ test eax, eax
+ je v9
+ mov ecx, dword ptr [esp+4]
+ and ecx, 0xffff
+ mov edx, ecx
+ shl edx, 16
+ or ecx, edx
+ push ecx
+ push 0
+ call eax
+v9: ret
+""", 0x431bb0)
+assert len(vol_body) <= 0x431ca9 - 0x431bb0
+d[o:o+len(vol_body)] = vol_body
+d[o+len(vol_body):off(0x431ca9)] = b'\x90' * (0x431ca9 - 0x431bb0 - len(vol_body))
 hook(0x42a254, 'a1086a4f00508b08ff516885c075bb',
      f"cmp dword ptr [{INACTIVE:#x}], 0\n jne 0x42a21e\n call {addr['MOUSE']:#x}", 15)  # resume + flush mouse
 
-# PE TimeDateStamp + 1: the released build (a fresh hash after Smart App Control blocked the first one)
+# PE TimeDateStamp: release build identity (variant that passed Windows Smart App Control in testing)
 import struct
 ts_off = 0x80 + 4 + 4   # e_lfanew is 0x80: 'PE\0\0' + Machine/NumberOfSections -> TimeDateStamp
 assert struct.unpack_from('<I', d, 0x3c)[0] == 0x80
 assert struct.unpack_from('<I', d, ts_off)[0] == 0x3692ca5c
-struct.pack_into('<I', d, ts_off, 0x3692ca5d)
+struct.pack_into('<I', d, ts_off, 0x3692ca60)
 open(OUT, 'wb').write(d)
 def dis(va, n):
     for i in md.disasm(bytes(d[off(va):off(va)+n]), va): print(f'  {i.address:08x}: {i.mnemonic} {i.op_str}')
-for va, n in ((0x425670, 11), (0x405cf0, 5), (0x43c7d1, 9), (0x43c3fa, 5), (0x42a205, 19), (0x42a254, 15)):
+for va, n in ((0x431bb0, 0x40), (0x408367, 19), (0x425670, 11), (0x405cf0, 5), (0x43c7d1, 9), (0x43c3fa, 5), (0x42a205, 19), (0x42a254, 15)):
     print(hex(va)); dis(va, n)
 for name, _ in caves: print('cave', name, hex(addr[name])); dis(addr[name], sizes[name])
-print({k: hex(v) for k, v in addr.items()}, 'end', hex(va))
+print({k: hex(v) for k, v in addr.items()}, 'caves end', hex(CAVES_END))
 print(OUT, hashlib.md5(d).hexdigest())

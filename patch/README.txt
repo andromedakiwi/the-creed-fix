@@ -1,5 +1,5 @@
 =====================================================================
- THE CREED (1999) - UNOFFICIAL PATCH v1.4
+ THE CREED (1999) - UNOFFICIAL PATCH v1.5
  by Andromeda Kiwi + Claude
 =====================================================================
 
@@ -66,8 +66,19 @@ Ogg Vorbis encoder, set the file name pattern to Track<track>, untick
 track 1 (data track) and set the output folder to <game>\Music.
 
 The included winmm.dll (ogg-winmm) plays those files whenever the
-game asks for a CD audio track. In-game, this is the "music" volume.
-Without the Music folder the game is simply silent there.
+game asks for a CD audio track. In-game, this is the "music" volume,
+and the music volume slider now controls it. Without the Music folder
+the game is simply silent there.
+
+
+---------------------------------------------------------------------
+ OPTIONAL: SKIP THE INTRO VIDEO
+---------------------------------------------------------------------
+
+In the launcher, open Configuration and untick "Intro Videos"
+(formerly "Intro Attract"): Single Player then goes straight to the
+game menu. Ticked, the intro and the idle "attract" video play as in
+the original.
 
 
 ---------------------------------------------------------------------
@@ -112,6 +123,14 @@ Without the Music folder the game is simply silent there.
    game was paused is discarded (it used to throw the cursor off
    screen).
 
+8. Music volume. The slider changed the sound card's analogue
+   "CD audio" mixer line, which modern PCs don't have, so it did
+   nothing. It now sets ogg-winmm's volume.
+
+9. Intro video. The startup video always played; the "Intro
+   Attract" option only affected the idle attract video. The option
+   is now called "Intro Videos" and also skips the startup video.
+
 
 ---------------------------------------------------------------------
  KNOWN ISSUES
@@ -122,7 +141,8 @@ Without the Music folder the game is simply silent there.
   It has no per-app exception; it can only be turned off in Windows
   Security > App & browser control.
 - The intro videos play in a window (desktop visible at the sides);
-  the game goes full screen as soon as you press Enter/Esc.
+  the game goes full screen as soon as you press Enter/Esc. Untick
+  "Intro Videos" in Configuration to skip them.
 - Missions have not been tested to the end yet. The game was infamous
   for freezing before the ending - reports very welcome.
 - Multiplayer (DirectPlay) untested.
@@ -167,6 +187,8 @@ CrashDumps folder - attach it to your report.
  CHANGES
 ---------------------------------------------------------------------
 
+v1.5  Music volume slider works (with ogg-winmm); "Intro Videos"
+      option in Configuration skips the startup video.
 v1.4  No more cursor/character trails at the screen edges; cursor no
       longer lost after Alt+Tab.
 v1.3  Alt+Tab / Ctrl+Alt+Del fixed: the game pauses when you leave and
@@ -184,12 +206,14 @@ v1.0  First release: registry fix, menu background fix, gameplay
 ---------------------------------------------------------------------
 
 Original Creed.exe MD5: 746DFE681C5B157DBD53C3CD18D336C5
-Patched  Creed.exe MD5: C8E4A51C772495CD13CA5811A0536552
+Patched  Creed.exe MD5: 6A89D088815DC65E8FA531BE3D95C712
 
 File offset  VA          Change
-0x00088      (PE hdr)    TimeDateStamp +1 (release build identity)
+0x00088      (PE hdr)    TimeDateStamp (release build identity)
 0x00180      (PE hdr)    .text VirtualSize 0x872C6 -> 0x87400
                          (maps the code caves below)
+0x001A8      (PE hdr)    .rdata VirtualSize 0x1A23 -> 0x1C00
+                         (maps the strings added in its slack)
 0x06115      0x00406D15  CreateSurface caps of the background buffer
                          0x1800 (SYSTEMMEMORY|TEXTURE) ->
                          0x2840 (OFFSCREENPLAIN|SYSTEMMEMORY|3DDEVICE)
@@ -213,11 +237,18 @@ File offset  VA          Change
 0x29654      0x0042A254  ...leave when it is 0, call MOUSE cave, then
                          the original RestoreAllSurfaces + reload
                          (was: IDirectDraw4::TestCooperativeLevel)
-0x877C4      0x004883C4  MOUSE: one GetDeviceState on the mouse to drop
+0x07767      0x00408367  before the startup video -> jmp INTRO cave
+0x877C4      0x004883C4  INTRO: skip the video in multiplayer or when
+                         "Intro Videos" ([0x4F5258], Config.dat) is off
+0x877EC      0x004883EC  MOUSE: one GetDeviceState on the mouse to drop
                          movement accumulated while paused
+0x30FB0      0x00431BB0  music volume function body replaced:
+                         auxSetVolume(0, vol | vol<<16) from winmm.dll
+                         (was mixer API on the CD-audio line)
+0xA602C      (resource)  checkbox "Intro Attract" -> "Intro Videos"
 0x053C2      0x00405FC2  keyboard SetCooperativeLevel 9 -> 0xA
                          (non-exclusive, background)
-0x877D8      0x004883D8  strings used by the caves
+0x89230      0x0048AA30  strings used by the caves (.rdata slack)
 
 Registry the original game reads: HKEY_CLASSES_ROOT\The Creed
   (Scene8, Scene16, InstallType, InstallDir, Password, LockCode).

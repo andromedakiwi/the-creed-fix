@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.5 – 2026-10-26
+- Music volume slider works: it now sets ogg-winmm's volume instead of the CD-audio mixer line that modern PCs don't have.
+- Configuration: *Intro Attract* renamed *Intro Videos*; unticked, Single Player skips the startup video and goes straight to the menu.
+- No-CD strings moved to the `.rdata` slack to make room; build script `tools/dev/build_v1.5.py`.
+
 ## v1.4 – 2026-10-26
 - No more cursor/character trails at the screen edges: all dirty rectangles are clipped to the screen at the start of the restore function (replaces the depth-only clipping from v1.0).
 - Cursor no longer thrown off screen after Alt+Tab: mouse movement accumulated while paused is discarded on resume.

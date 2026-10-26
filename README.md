@@ -6,7 +6,7 @@ Makes **The Creed** (Insomnia Entertainment / Dreamtime Interactive / Electronic
 
 The Creed is a cyberpunk action-adventure that was famous for being buggy even in 1999. On modern Windows it would not install, crashed or showed black screens. This patch fixes the game's own bugs in `Creed.exe` and bundles a tested graphics/music setup.
 
-> **Status:** community test release (v1.4). Tested on Windows 11 (Intel graphics) through the menus, intro and gameplay, including Alt+Tab. Please [report](../../issues/new/choose) what works and what breaks.
+> **Status:** community test release (v1.5). Tested on Windows 11 (Intel graphics) through several missions, including Alt+Tab, No-CD and music. Please [report](../../issues/new/choose) what works and what breaks.
 
 By **Andromeda Kiwi + Claude**.
 
@@ -14,7 +14,7 @@ By **Andromeda Kiwi + Claude**.
 
 ## Download & install
 
-1. Download **`TheCreed_UnofficialPatch_v1.4.zip`** from [Releases](../../releases/latest).
+1. Download **`TheCreed_UnofficialPatch_v1.5.zip`** from [Releases](../../releases/latest).
 2. *(Optional)* keep a copy of your original `Creed.exe`.
 3. Extract the zip into your game folder (the one with `Creed.exe` and `Data\`) and overwrite.
 4. Run `Creed.exe` and play.
@@ -27,7 +27,10 @@ No installer, no registry, no admin rights. With the CD in the drive the game be
 Run `Extras\CopyCDs.bat`. It asks for CD 1 ("Main") and CD 2 ("Data") and copies the ~120 MB the game reads from them into `cd1\` and `cd2\`. If those folders are missing the game just asks for the CD, as before.
 
 ### Optional: music
-The ambient soundtrack is CD 1 audio tracks 2–19. Rip them with [fre:ac](https://www.freac.org/) (portable, free) to Ogg Vorbis as `Music\Track02.ogg` … `Music\Track19.ogg`. The bundled `winmm.dll` ([ogg-winmm](https://github.com/ayuanx/ogg-winmm)) plays them in place of the CD.
+The ambient soundtrack is CD 1 audio tracks 2–19. Rip them with [fre:ac](https://www.freac.org/) (portable, free) to Ogg Vorbis as `Music\Track02.ogg` … `Music\Track19.ogg`. The bundled `winmm.dll` ([ogg-winmm](https://github.com/ayuanx/ogg-winmm)) plays them in place of the CD, and the in-game *music* volume slider now controls them.
+
+### Optional: skip the intro video
+In the launcher's **Configuration**, untick **Intro Videos** (formerly *Intro Attract*) to go straight to the game menu. Ticked, the original intro and the idle "attract" video play as before.
 
 ---
 
@@ -43,6 +46,8 @@ The ambient soundtrack is CD 1 audio tracks 2–19. Rip them with [fre:ac](https
 | Cursor gone after Alt+Tab | Mouse read in immediate mode: movement made on the desktop is delivered all at once on return, throwing the cursor far off screen | Accumulated movement discarded on resume |
 | Needs the CDs | Disc check by volume label (`CREED_MAIN` / `CREED_DATA`) to read `data.v00` / `Data.v01-03` | Uses `cd1\` / `cd2\` when present, otherwise the real CD |
 | No music without the CD | CD-Audio via MCI | ogg-winmm |
+| Music volume slider does nothing | Volume set through the sound card's analogue *CD-audio mixer line*, which modern PCs don't have | Slider routed to ogg-winmm's volume (`auxSetVolume`) |
+| Intro video can't be skipped | Startup video always played; the *Intro Attract* option only affected the idle attract video | The option (now *Intro Videos*) also skips the startup video |
 | Graphics on modern GPUs | DirectDraw 6 + Direct3D HAL, 16-bit | dgVoodoo2 2.87.6 with a tested config |
 
 All the details – addresses, disassembly and how each bug was found – are in **[docs/TECHNICAL.md](docs/TECHNICAL.md)**.
@@ -50,7 +55,7 @@ All the details – addresses, disassembly and how each bug was found – are in
 ## Known issues
 
 - **Windows 11 Smart App Control** may block the patched `Creed.exe` (*"could not verify its publisher"*): the executable is not code-signed yet. SAC has no per-app exception; it can only be turned off in Windows Security → App & browser control.
-- Intro videos play in a window; the game goes full screen after Enter/Esc.
+- Intro videos play in a window (untick *Intro Videos* in Configuration to skip them); the game goes full screen after Enter/Esc.
 - Not yet tested to the end of the campaign (the game was infamous for freezing before the ending).
 - Multiplayer untested. The *Non-Accelerated* (software/Ramp) version is not supported – its 3D renders almost black on modern systems.
 - Don't run DxWnd at the same time; avoid saving from `dgVoodooCpl.exe` (see `patch/README.txt` for the settings that matter).
@@ -63,12 +68,12 @@ Open an [issue](../../issues/new/choose) with your Windows version, GPU and what
 
 ```
 patch/            the release content, ready to extract into the game folder
-  Creed.exe         patched executable (MD5 C8E4A51C772495CD13CA5811A0536552)
+  Creed.exe         patched executable (MD5 6A89D088815DC65E8FA531BE3D95C712)
   DDraw.dll, D3DImm.dll, dgVoodoo.conf   dgVoodoo2 2.87.6 + config
   winmm.dll, winmm.ini                   ogg-winmm (CD music)
   Extras/           CopyCDs.bat (No-CD), EnableCrashDumps.bat
 tools/patch_creed.py  rebuilds the patched Creed.exe from the original (stdlib only)
-tools/dev/build_v1.4.py  assembles every change from the original exe (keystone/capstone)
+tools/dev/build_v1.5.py  assembles every change from the original exe (keystone/capstone)
 docs/                 technical write-up and changelog
 ```
 
