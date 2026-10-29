@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.0
+- `Creed.exe` is no longer modified or distributed: an open-source `dinput.dll` proxy (`src/creedfix`) applies all v1.5 fixes in memory at start-up, after checking that the executable is the original v1.6 build 160, and logs to `creedfix.log`.
+- dinput.dll is built from source by the release workflow.
+- No-CD folders resolved next to `Creed.exe` (absolute path), independent of the working folder.
+- v1.x on-disk patch tools moved to `tools/legacy/`.
+
 ## v1.5 – 2026-10-26
 - Music volume slider works: it now sets ogg-winmm's volume instead of the CD-audio mixer line that modern PCs don't have.
 - Configuration: *Intro Attract* renamed *Intro Videos*; unticked, Single Player skips the startup video and goes straight to the menu.

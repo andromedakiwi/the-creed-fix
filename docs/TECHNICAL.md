@@ -4,6 +4,20 @@ Reverse-engineering notes behind the unofficial patch. All addresses refer to **
 
 Tools used: DxWnd logs, Windows Error Reporting minidumps, Task Manager full dumps, Python (`pefile`, `capstone`, `keystone`, `minidump`).
 
+## Patch architecture (v2.0)
+
+Patch v1.0–v1.5 wrote every change into `Creed.exe` (code caves in the zero padding at the end of `.text`, strings in the `.rdata` slack). That meant distributing a modified copyrighted executable, and its new, unsigned hash was often blocked by Windows 11 Smart App Control.
+
+Since v2.0 the original `Creed.exe` is untouched. `Creed.exe` imports `DINPUT.dll` (only `DirectInputCreateA`), and Windows loads a `dinput.dll` from the application folder before the system one. `src/creedfix/creedfix.c` builds such a proxy:
+
+- **DllMain** checks the main module: base `0x00400000` (the exe has no relocations), PE `TimeDateStamp` `0x3692CA5C`, and the original bytes at all ten patch sites. Only if everything matches are the sites patched – all or nothing – with `VirtualProtect` + `FlushInstructionCache`. Each change is logged to `creedfix.log`; a v1.x executable is detected and reported with a message box on the first `DirectInputCreateA`.
+- **Hooks** are 5-byte `jmp` to functions in the DLL (rel32 computed at runtime, so the DLL can load anywhere). Stubs that must preserve the game's registers are `naked` functions with inline assembly and return to the game with `push addr / ret`; the CD search and music volume are plain C (`cd_find`, `music_volume`), the CD search falling back to the original code through a trampoline (`sub esp, 0x20C` + continue at `0x00405CF6`).
+- **Data** that v1.x kept in spare file space now lives in the DLL (e.g. the WM_ACTIVATEAPP flag `g_inactive`, previously `0x004F8F00`). The No-CD root is now the absolute `<game folder>\cd1\` / `cd2\`.
+- The **Configuration label** is renamed by patching the in-memory resource (same UTF-16 length).
+- **DirectInput** calls are forwarded to the system `dinput.dll` (`GetSystemDirectory`, i.e. `SysWOW64`), loaded lazily on the first call rather than inside DllMain.
+
+The sections below describe each bug and fix with the game addresses; where they mention cave addresses or file offsets, those refer to the v1.x on-disk patch (`tools/legacy/`).
+
 ## The game at a glance
 
 - `Creed.exe` is the game, `AGOS.exe` a separate tool (no DirectDraw).

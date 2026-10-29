@@ -1,7 +1,7 @@
 name: Release
 
 # Publishes a GitHub Release when VERSION changes on main (or on demand).
-# The zip is built from the patch/ folder; notes come from docs/release-notes/v<VERSION>.md.
+# dinput.dll is built from src/creedfix; the zip is built from patch/; notes come from docs/release-notes/v<VERSION>.md.
 on:
   push:
     branches: [main]
@@ -32,13 +32,15 @@ jobs:
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Verify patched Creed.exe
+      - name: Build creedfix (dinput.dll)
         if: steps.check.outputs.exists == 'false'
         run: |
-          expected=$(grep -oP "MD5_PATCHED = '\K[0-9a-f]+" tools/patch_creed.py)
-          actual=$(md5sum patch/Creed.exe | cut -d' ' -f1)
-          echo "expected $expected, got $actual"
-          test "$expected" = "$actual"
+          sudo apt-get update -q
+          sudo apt-get install -y -q gcc-mingw-w64-i686 binutils-mingw-w64-i686
+          make -C src/creedfix
+          i686-w64-mingw32-objdump -p src/creedfix/dinput.dll | grep -q DirectInputCreateA
+          cp src/creedfix/dinput.dll patch/dinput.dll
+          sha256sum patch/dinput.dll
 
       - name: Build zip
         if: steps.check.outputs.exists == 'false'

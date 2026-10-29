@@ -1,14 +1,16 @@
 =====================================================================
- THE CREED (1999) - UNOFFICIAL PATCH v1.5
+ THE CREED (1999) - UNOFFICIAL PATCH v2.0
  by Andromeda Kiwi + Claude
 =====================================================================
 
 Makes The Creed (Insomnia Entertainment / Dreamtime Interactive /
 Electronic Arts, 1999) playable on Windows 10/11 in full screen, with
-optional No-CD and CD music.
+optional No-CD and CD music. Your original Creed.exe is not modified:
+the included dinput.dll applies the fixes in memory when the game
+starts (and logs them to creedfix.log).
 
-For the HARDWARE ACCELERATED version of the game only
-(Creed.exe v1.6 build 160, Data\Scene16.cus present).
+For the HARDWARE ACCELERATED version of the game only, with the
+ORIGINAL Creed.exe v1.6 build 160 (Data\Scene16.cus present).
 
 This is a community TEST release - please report what works and what
 breaks (see "Reporting problems").
@@ -18,15 +20,18 @@ breaks (see "Reporting problems").
  INSTALL
 ---------------------------------------------------------------------
 
-1. (Optional) Keep a copy of your original Creed.exe somewhere safe.
-
-2. Extract this zip into your The Creed game folder (the folder with
+1. Extract this zip into your The Creed game folder (the folder with
    Creed.exe and the Data folder) and overwrite when asked.
 
-3. Start Creed.exe and play.
+2. Start Creed.exe and play.
 
-That's it. No installer, no registry, no admin rights. With the CD in
-the drive the game runs exactly like the original did.
+That's it. No installer, no registry, no admin rights, and Creed.exe
+is not changed. With the CD in the drive the game runs exactly like
+the original did.
+
+Upgrading from patch v1.x: v1.x replaced Creed.exe. Put the original
+back (Creed.exe.original or your backup). With a v1.x Creed.exe the
+fixes are not applied and a message tells you so.
 
 If the original CD setup does not run on your PC, copying the
 Hardware Accelerated game files to a folder (e.g. C:\Games\The Creed,
@@ -99,8 +104,8 @@ the original.
    the screen edges (original 1999 bug). When something is near or
    past the screen edge, the game's "dirty rectangles" go outside the
    640x480 screen: the depth copy then reads outside its buffer
-   (crash) and the background restore is rejected (trails). Creed.exe
-   now clips those rectangles to the screen.
+   (crash) and the background restore is rejected (trails). The
+   rectangles are now clipped to the screen.
 
 4. Graphics on modern GPUs: dgVoodoo2 2.87.6 (by Dege) is included,
    configured for full screen, 4:3 aspect ratio, working menu
@@ -108,7 +113,7 @@ the original.
 
 5. Optional No-CD. The game looked for a CD labelled CREED_MAIN or
    CREED_DATA and read Data\data.v00 (CD 1) or Data\Data.v01-v03
-   (CD 2) from it. Creed.exe now uses the cd1 / cd2 folders when they
+   (CD 2) from it. The game now uses the cd1 / cd2 folders when they
    exist, and falls back to the real CD when they don't. There is no
    copy protection involved - only a disc check.
 
@@ -117,7 +122,7 @@ the original.
 7. Alt+Tab / Ctrl+Alt+Del. The game paused on focus loss until
    DirectDraw reported exclusive mode back - which never happens under
    a modern wrapper - so it never resumed, and the keyboard was opened
-   in exclusive background mode. Creed.exe now pauses and resumes on
+   in exclusive background mode. The game now pauses and resumes on
    WM_ACTIVATEAPP and uses a non-exclusive keyboard; the mouse is no
    longer captured by dgVoodoo2, and mouse movement made while the
    game was paused is discarded (it used to throw the cursor off
@@ -136,10 +141,9 @@ the original.
  KNOWN ISSUES
 ---------------------------------------------------------------------
 
-- Windows 11 Smart App Control may block Creed.exe ("could not verify
-  its publisher") because the patched executable is not code-signed.
-  It has no per-app exception; it can only be turned off in Windows
-  Security > App & browser control.
+- Windows 11 Smart App Control: v2.0 keeps the original Creed.exe, but
+  the new dinput.dll is not code-signed yet. Please report if it is
+  blocked ("could not verify its publisher").
 - The intro videos play in a window (desktop visible at the sides);
   the game goes full screen as soon as you press Enter/Esc. Untick
   "Intro Videos" in Configuration to skip them.
@@ -165,9 +169,9 @@ the original.
  UNINSTALL
 ---------------------------------------------------------------------
 
-Put your original Creed.exe back and delete DDraw.dll, D3DImm.dll,
-dgVoodoo.conf, winmm.dll and winmm.ini (and the cd1, cd2 and Music
-folders if you created them).
+Delete dinput.dll, DDraw.dll, D3DImm.dll, dgVoodoo.conf, winmm.dll,
+winmm.ini and creedfix.log (and the cd1, cd2 and Music folders if you
+created them). Creed.exe was never modified.
 
 
 ---------------------------------------------------------------------
@@ -187,6 +191,10 @@ CrashDumps folder - attach it to your report.
  CHANGES
 ---------------------------------------------------------------------
 
+v2.0  Creed.exe is no longer modified: the same fixes are applied in
+      memory by dinput.dll (open source, src/creedfix), which checks
+      the executable first and logs to creedfix.log. No-CD folders
+      are found next to Creed.exe regardless of the working folder.
 v1.5  Music volume slider works (with ogg-winmm); "Intro Videos"
       option in Configuration skips the startup video.
 v1.4  No more cursor/character trails at the screen edges; cursor no
@@ -202,53 +210,34 @@ v1.0  First release: registry fix, menu background fix, gameplay
 
 
 ---------------------------------------------------------------------
- TECHNICAL DETAILS (based on Creed.exe v1.6 build 160)
+ TECHNICAL DETAILS (Creed.exe v1.6 build 160)
 ---------------------------------------------------------------------
 
-Original Creed.exe MD5: 746DFE681C5B157DBD53C3CD18D336C5
-Patched  Creed.exe MD5: 6A89D088815DC65E8FA531BE3D95C712
+Creed.exe imports DINPUT.dll; Windows loads dinput.dll from the game
+folder first. On load it checks the image (base 0x400000, PE
+timestamp 3692CA5C, original bytes at every site - all or nothing),
+patches the code in memory and forwards DirectInputCreateA/W/Ex to
+the system dinput.dll. Source: src/creedfix/creedfix.c.
 
-File offset  VA          Change
-0x00088      (PE hdr)    TimeDateStamp (release build identity)
-0x00180      (PE hdr)    .text VirtualSize 0x872C6 -> 0x87400
-                         (maps the code caves below)
-0x001A8      (PE hdr)    .rdata VirtualSize 0x1A23 -> 0x1C00
-                         (maps the strings added in its slack)
-0x06115      0x00406D15  CreateSurface caps of the background buffer
-                         0x1800 (SYSTEMMEMORY|TEXTURE) ->
-                         0x2840 (OFFSCREENPLAIN|SYSTEMMEMORY|3DDEVICE)
-0x24A70      0x00425670  dirty-rect function entry -> jmp CLIP cave
-0x876D0      0x004882D0  CLIP: clip every rect of the list at 0x4B689C
-                         to 0..640 x 0..480 in place, then the replaced
-                         instructions, jmp 0x0042567B
-0x050F0      0x00405CF0  CD drive search -> jmp CD cave
-0x87728      0x00488328  CD: disc 1 -> "cd1\", disc 2 -> "cd2\"
-                         ([0x4F5368]); if cd?\Data\data.v00 / Data.v01
-                         opens (CreateFileA), use it as the CD root and
-                         return 1, else run the original drive search
-0x3BBD1      0x0043C7D1  after the registry read -> jmp REG cave
-0x87784      0x00488384  REG: [0x4F7234] = 1 (accelerated scene data
-                         installed), [0x4F5368] = 1 (full install),
-                         then the replaced instructions, jmp 0x0043C7DA
-0x3B7FA      0x0043C3FA  WndProc -> jmp WND cave
-0x877A4      0x004883A4  WND: on WM_ACTIVATEAPP store [0x4F8F00] =
-                         !wParam (zero page tail of .data), continue
-0x29605      0x0042A205  focus pause: enter while [0x4F8F00] != 0
-0x29654      0x0042A254  ...leave when it is 0, call MOUSE cave, then
-                         the original RestoreAllSurfaces + reload
-                         (was: IDirectDraw4::TestCooperativeLevel)
-0x07767      0x00408367  before the startup video -> jmp INTRO cave
-0x877C4      0x004883C4  INTRO: skip the video in multiplayer or when
-                         "Intro Videos" ([0x4F5258], Config.dat) is off
-0x877EC      0x004883EC  MOUSE: one GetDeviceState on the mouse to drop
-                         movement accumulated while paused
-0x30FB0      0x00431BB0  music volume function body replaced:
-                         auxSetVolume(0, vol | vol<<16) from winmm.dll
-                         (was mixer API on the CD-audio line)
-0xA602C      (resource)  checkbox "Intro Attract" -> "Intro Videos"
-0x053C2      0x00405FC2  keyboard SetCooperativeLevel 9 -> 0xA
-                         (non-exclusive, background)
-0x89230      0x0048AA30  strings used by the caves (.rdata slack)
+VA          Change (in memory)
+0x00406D15  background buffer caps 0x1800 (SYSTEMMEMORY|TEXTURE) ->
+            0x2840 (OFFSCREENPLAIN|SYSTEMMEMORY|3DDEVICE)
+0x00405FC2  DirectInput keyboard cooperative level 9 -> 0xA
+0x00405CF0  CD drive search -> cd_find(): <game>\cd1\ or cd2\ if the
+            data file exists, else the original search (trampoline)
+0x00408367  startup video only if "Intro Videos" ([0x4F5258]) is on
+            and not in multiplayer
+0x00425670  clip every dirty rect (0x4B689C) to 640x480 in place
+0x0042A205  focus pause entered while the app is inactive
+0x0042A254  ...left when active again; mouse delta flushed
+            (GetDeviceState), then the original restore/reload
+0x0043C3FA  window procedure records WM_ACTIVATEAPP
+0x0043C7D1  after the registry read: [0x4F7234]=1, [0x4F5368]=1
+0x00431BB0  music volume -> winmm auxSetVolume (ogg-winmm)
+(resource)  Configuration checkbox "Intro Attract" -> "Intro Videos"
+
+v1.x applied the same changes to Creed.exe on disk (code caves at
+0x004882D0+); docs/TECHNICAL.md in the repository has the details.
 
 Registry the original game reads: HKEY_CLASSES_ROOT\The Creed
   (Scene8, Scene16, InstallType, InstallDir, Password, LockCode).

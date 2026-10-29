@@ -1,4 +1,4 @@
-﻿# The Creed (1999) - Unofficial Patch v1.5 - by Andromeda Kiwi + Claude
+﻿# The Creed (1999) - Unofficial Patch v2.0 - by Andromeda Kiwi + Claude
 # OPTIONAL: copies the files the game reads from its two CDs into the game folder
 # (cd1\Data and cd2\Data), so the CDs are no longer needed to play.
 # Without this step the game still works - it just asks for the CD like the original.

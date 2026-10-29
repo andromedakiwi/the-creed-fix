@@ -21,8 +21,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ---------------------------------------------------------------------------
-This license covers the patch scripts, tools and documentation written for
-this project. It does not cover:
+This license covers the code (src/creedfix, the dinput.dll proxy), scripts,
+tools and documentation written for this project. It does not cover:
   - The Creed / Creed.exe (c) 1998 Insomnia Entertainment Pty Limited
+    (not included in this project)
   - dgVoodoo2 (DDraw.dll, D3DImm.dll) by Dege - freeware, its own terms
   - ogg-winmm (winmm.dll) by ayuanx - GPL-2.0, see patch/Licenses
